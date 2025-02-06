@@ -11,15 +11,15 @@ void die(const char* message){
 
 int main(){
 
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    int fd = socket(AF_INET, SOCK_STREAM, 0); //create file descriptor using socket
     if (fd<0){
         die("socket()");
     }
 
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(3000);
-    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
+    struct sockaddr_in addr = {}; //struct from the netinet file
+    addr.sin_family = AF_INET;// ip belongs to ipv4 hai iska mtlb
+    addr.sin_port = ntohs(3000);//port
+    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK); //INADDR_LOOPBACK is a constant for localhost 127.0.0.1 in networking
     int rv = connect(fd,(const struct sockaddr*)&addr, sizeof(addr));
 
     if (rv){

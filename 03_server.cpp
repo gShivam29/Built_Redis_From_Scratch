@@ -10,6 +10,36 @@ void die(const char *message)
     exit(1);
 }
 
+static int32_t one_request(int connfd){
+
+}
+
+static int32_t read_full(int fd, char *buf, size_t n){
+    while(n > 0){
+        ssize_t rv = read(fd,buf,n);
+        if (rv <=0) return -1;
+
+        assert((size_t)rv <= n);
+        n -= (size_t)rv;
+        buf += rv;
+    }
+    return 0;
+}
+
+static int32_t write_full(int fd, const char *buf, size_t n){
+    while(n>0){
+        ssize_t rv = write(fd,buf,n);
+
+        if (rv<=0){
+            return -1;
+        }
+
+        assert((size_t)rv <= n);
+        n-=(size_t)rv;
+        buf += rv;
+    }
+    return 0;
+}
 static void do_something(int connfd)
 {
     char rbuf[64] = {}; //read buffer
@@ -68,17 +98,25 @@ int main()
     while (true)
     {
         struct sockaddr_in client_addr = {}; //sockaddr_in stores ips, {} sets all the members to 0
+
         socklen_t socklen = sizeof(client_addr); //socklen_t is an unsigned integer type datatype used to rep the size in bytes of socket addresses.
+
         int connfd = accept(fd, (struct sockaddr *)&client_addr, &socklen); 
         /* fd is the original fd created using socket and bound using bind
         the sockaddr pointer points to an area that stores the address of the client it is mandatory for the accept function
         &socklen is A pointer to the variable that holds the size of client_addr */
+
         if (connfd < 0)
         {
             continue;
         }
 
-        do_something(connfd); 
+        // do_something(connfd); 
+
+        while(true){
+            int32_t err = one_request(connfd);
+        }
+
         close(connfd);
         
     }
