@@ -1,0 +1,356 @@
+[4mpoll[24m(2)                                          System Calls Manual                                          [4mpoll[24m(2)
+
+[1mNAME[0m
+       poll, ppoll - wait for some event on a file descriptor
+
+[1mLIBRARY[0m
+       Standard C library ([4mlibc[24m, [4m-lc[24m)
+
+[1mSYNOPSIS[0m
+       [1m#include <poll.h>[0m
+
+       [1mint poll(struct pollfd *[4m[22mfds[24m[1m, nfds_t [4m[22mnfds[24m[1m, int [4m[22mtimeout[24m[1m);[0m
+
+       [1m#define _GNU_SOURCE         [22m/* See feature_test_macros(7) */
+       [1m#include <poll.h>[0m
+
+       [1mint ppoll(struct pollfd *[4m[22mfds[24m[1m, nfds_t [4m[22mnfds[24m[1m,[0m
+                 [1mconst struct timespec *_Nullable [4m[22mtmo_p[24m[1m,[0m
+                 [1mconst sigset_t *_Nullable [4m[22msigmask[24m[1m);[0m
+
+[1mDESCRIPTION[0m
+       [1mpoll[22m()  performs a similar task to [1mselect[22m(2): it waits for one of a set of file descriptors to become ready to
+       perform I/O.  The Linux-specific [1mepoll[22m(7) API performs a similar task, but offers features beyond those  found
+       in [1mpoll[22m().
+
+       The  set of file descriptors to be monitored is specified in the [4mfds[24m argument, which is an array of structures
+       of the following form:
+
+           struct pollfd {
+               int   fd;         /* file descriptor */
+               short events;     /* requested events */
+               short revents;    /* returned events */
+           };
+
+       The caller should specify the number of items in the [4mfds[24m array in [4mnfds[24m.
+
+       The field [4mfd[24m contains a file descriptor for an open file.  If this field is negative, then  the  corresponding
+       [4mevents[24m field is ignored and the [4mrevents[24m field returns zero.  (This provides an easy way of ignoring a file de‐
+       scriptor for a single [1mpoll[22m() call: simply set the [4mfd[24m field to its bitwise complement.)
+
+       The  field [4mevents[24m is an input parameter, a bit mask specifying the events the application is interested in for
+       the file descriptor [4mfd[24m.  This field may be specified as zero, in which case the only events that  can  be  re‐
+       turned in [4mrevents[24m are [1mPOLLHUP[22m, [1mPOLLERR[22m, and [1mPOLLNVAL [22m(see below).
+
+       The  field  [4mrevents[24m  is an output parameter, filled by the kernel with the events that actually occurred.  The
+       bits returned in [4mrevents[24m can include any of those specified in [4mevents[24m, or one of the values [1mPOLLERR[22m,  [1mPOLLHUP[22m,
+       or  [1mPOLLNVAL[22m.   (These  three  bits  are meaningless in the [4mevents[24m field, and will be set in the [4mrevents[24m field
+       whenever the corresponding condition is true.)
+
+       If none of the events requested (and no error) has occurred for any  of  the  file  descriptors,  then  [1mpoll[22m()
+       blocks until one of the events occurs.
+
+       The [4mtimeout[24m argument specifies the number of milliseconds that [1mpoll[22m() should block waiting for a file descrip‐
+       tor to become ready.  The call will block until either:
+
+       •  a file descriptor becomes ready;
+
+       •  the call is interrupted by a signal handler; or
+
+       •  the timeout expires.
+
+       Being "ready" means that the requested operation will not block; thus, [1mpoll[22m()ing regular files, block devices,
+       and other files with no reasonable polling semantic [4malways[24m returns instantly as ready to read and write.
+
+       Note  that  the [4mtimeout[24m interval will be rounded up to the system clock granularity, and kernel scheduling de‐
+       lays mean that the blocking interval may overrun by a small amount.  Specifying a negative  value  in  [4mtimeout[0m
+       means  an infinite timeout.  Specifying a [4mtimeout[24m of zero causes [1mpoll[22m() to return immediately, even if no file
+       descriptors are ready.
+
+       The bits that may be set/returned in [4mevents[24m and [4mrevents[24m are defined in [4m<poll.h>[24m:
+
+       [1mPOLLIN [22mThere is data to read.
+
+       [1mPOLLPRI[0m
+              There is some exceptional condition on the file descriptor.  Possibilities include:
+
+              •  There is out-of-band data on a TCP socket (see [1mtcp[22m(7)).
+
+              •  A pseudoterminal master in packet mode has seen a state change on the slave (see [1mioctl_tty[22m(2)).
+
+              •  A [4mcgroup.events[24m file has been modified (see [1mcgroups[22m(7)).
+
+       [1mPOLLOUT[0m
+              Writing is now possible, though a write larger than the available space in a socket or pipe will  still
+              block (unless [1mO_NONBLOCK [22mis set).
+
+       [1mPOLLRDHUP [22m(since Linux 2.6.17)
+              Stream socket peer closed connection, or shut down writing half of connection.  The [1m_GNU_SOURCE [22mfeature
+              test macro must be defined (before including [4many[24m header files) in order to obtain this definition.
+
+       [1mPOLLERR[0m
+              Error  condition  (only  returned  in [4mrevents[24m; ignored in [4mevents[24m).  This bit is also set for a file de‐
+              scriptor referring to the write end of a pipe when the read end has been closed.
+
+       [1mPOLLHUP[0m
+              Hang up (only returned in [4mrevents[24m; ignored in [4mevents[24m).  Note that when reading from a channel such as a
+              pipe or a stream socket, this event merely indicates that the peer closed its end of the channel.  Sub‐
+              sequent reads from the channel will return 0 (end of file) only after all outstanding data in the chan‐
+              nel has been consumed.
+
+       [1mPOLLNVAL[0m
+              Invalid request: [4mfd[24m not open (only returned in [4mrevents[24m; ignored in [4mevents[24m).
+
+       When compiling with [1m_XOPEN_SOURCE [22mdefined, one also has the following, which convey no further information be‐
+       yond the bits listed above:
+
+       [1mPOLLRDNORM[0m
+              Equivalent to [1mPOLLIN[22m.
+
+       [1mPOLLRDBAND[0m
+              Priority band data can be read (generally unused on Linux).
+
+       [1mPOLLWRNORM[0m
+              Equivalent to [1mPOLLOUT[22m.
+
+       [1mPOLLWRBAND[0m
+              Priority data may be written.
+
+       Linux also knows about, but does not use [1mPOLLMSG[22m.
+
+   [1mppoll()[0m
+       The relationship between [1mpoll[22m() and [1mppoll[22m() is analogous to the relationship between [1mselect[22m(2) and [1mpselect[22m(2):
+       like [1mpselect[22m(2), [1mppoll[22m() allows an application to safely wait until either a file descriptor becomes ready  or
+       until a signal is caught.
+
+       Other than the difference in the precision of the [4mtimeout[24m argument, the following [1mppoll[22m() call:
+
+           ready = ppoll(&fds, nfds, tmo_p, &sigmask);
+
+       is nearly equivalent to [4matomically[24m executing the following calls:
+
+           sigset_t origmask;
+           int timeout;
+
+           timeout = (tmo_p == NULL) ? -1 :
+                     (tmo_p->tv_sec * 1000 + tmo_p->tv_nsec / 1000000);
+           pthread_sigmask(SIG_SETMASK, &sigmask, &origmask);
+           ready = poll(&fds, nfds, timeout);
+           pthread_sigmask(SIG_SETMASK, &origmask, NULL);
+
+       The  above  code segment is described as [4mnearly[24m equivalent because whereas a negative [4mtimeout[24m value for [1mpoll[22m()
+       is interpreted as an infinite timeout, a negative value expressed in [4m*tmo_p[24m results in an error from [1mppoll[22m().
+
+       See the description of [1mpselect[22m(2) for an explanation of why [1mppoll[22m() is necessary.
+
+       If the [4msigmask[24m argument is specified as NULL, then no signal mask manipulation is performed (and thus  [1mppoll[22m()
+       differs from [1mpoll[22m() only in the precision of the [4mtimeout[24m argument).
+
+       The [4mtmo_p[24m argument specifies an upper limit on the amount of time that [1mppoll[22m() will block.  This argument is a
+       pointer to a [1mtimespec[22m(3) structure.
+
+       If [4mtmo_p[24m is specified as NULL, then [1mppoll[22m() can block indefinitely.
+
+[1mRETURN VALUE[0m
+       On  success,  [1mpoll[22m()  returns a nonnegative value which is the number of elements in the [4mpollfds[24m whose [4mrevents[0m
+       fields have been set to a nonzero value (indicating an event or an error).  A return value of  zero  indicates
+       that the system call timed out before any file descriptors became ready.
+
+       On error, -1 is returned, and [4merrno[24m is set to indicate the error.
+
+[1mERRORS[0m
+       [1mEFAULT [4m[22mfds[24m  points  outside  the process's accessible address space.  The array given as argument was not con‐
+              tained in the calling program's address space.
+
+       [1mEINTR  [22mA signal occurred before any requested event; see [1msignal[22m(7).
+
+       [1mEINVAL [22mThe [4mnfds[24m value exceeds the [1mRLIMIT_NOFILE [22mvalue.
+
+       [1mEINVAL [22m([1mppoll[22m()) The timeout value expressed in [4m*tmo_p[24m is invalid (negative).
+
+       [1mENOMEM [22mUnable to allocate memory for kernel data structures.
+
+[1mVERSIONS[0m
+       On some other UNIX systems, [1mpoll[22m() can fail with the error [1mEAGAIN [22mif the system fails to  allocate  kernel-in‐
+       ternal  resources, rather than [1mENOMEM [22mas Linux does.  POSIX permits this behavior.  Portable programs may wish
+       to check for [1mEAGAIN [22mand loop, just as with [1mEINTR[22m.
+
+       Some implementations define the nonstandard constant [1mINFTIM [22mwith the value -1 for use as a [4mtimeout[24m for [1mpoll[22m().
+       This constant is not provided in glibc.
+
+   [1mC library/kernel differences[0m
+       The Linux [1mppoll[22m() system call modifies its [4mtmo_p[24m argument.  However, the glibc wrapper function hides this be‐
+       havior by using a local variable for the timeout argument that is passed to the system call.  Thus, the  glibc
+       [1mppoll[22m() function does not modify its [4mtmo_p[24m argument.
+
+       The  raw [1mppoll[22m() system call has a fifth argument, [4msize_t[24m [4msigsetsize[24m, which specifies the size in bytes of the
+       [4msigmask[24m argument.  The glibc [1mppoll[22m() wrapper function specifies this argument  as  a  fixed  value  (equal  to
+       [4msizeof(kernel_sigset_t)[24m).   See  [1msigprocmask[22m(2) for a discussion on the differences between the kernel and the
+       libc notion of the sigset.
+
+[1mSTANDARDS[0m
+       [1mpoll[22m() POSIX.1-2008.
+
+       [1mppoll[22m()
+              Linux.
+
+[1mHISTORY[0m
+       [1mpoll[22m() POSIX.1-2001.  Linux 2.1.23.
+
+              On older kernels that lack this system call, the glibc [1mpoll[22m() wrapper function provides emulation using
+              [1mselect[22m(2).
+
+       [1mppoll[22m()
+              Linux 2.6.16, glibc 2.4.
+
+[1mNOTES[0m
+       The operation of [1mpoll[22m() and [1mppoll[22m() is not affected by the [1mO_NONBLOCK [22mflag.
+
+       For a discussion of what may happen if a file descriptor being  monitored  by  [1mpoll[22m()  is  closed  in  another
+       thread, see [1mselect[22m(2).
+
+[1mBUGS[0m
+       See the discussion of spurious readiness notifications under the BUGS section of [1mselect[22m(2).
+
+[1mEXAMPLES[0m
+       The  program below opens each of the files named in its command-line arguments and monitors the resulting file
+       descriptors for readiness to read ([1mPOLLIN[22m).  The program loops, repeatedly using [1mpoll[22m() to  monitor  the  file
+       descriptors,  printing  the  number  of ready file descriptors on return.  For each ready file descriptor, the
+       program:
+
+       •  displays the returned [4mrevents[24m field in a human-readable form;
+
+       •  if the file descriptor is readable, reads some data from it, and displays that data on standard output; and
+
+       •  if the file descriptor was not readable, but some other event occurred  (presumably  [1mPOLLHUP[22m),  closes  the
+          file descriptor.
+
+       Suppose we run the program in one terminal, asking it to open a FIFO:
+
+           $ [1mmkfifo myfifo[0m
+           $ [1m./poll_input myfifo[0m
+
+       In a second terminal window, we then open the FIFO for writing, write some data to it, and close the FIFO:
+
+           $ [1mecho aaaaabbbbbccccc > myfifo[0m
+
+       In the terminal where we are running the program, we would then see:
+
+           Opened "myfifo" on fd 3
+           About to poll()
+           Ready: 1
+             fd=3; events: POLLIN POLLHUP
+               read 10 bytes: aaaaabbbbb
+           About to poll()
+           Ready: 1
+             fd=3; events: POLLIN POLLHUP
+               read 6 bytes: ccccc
+
+           About to poll()
+           Ready: 1
+             fd=3; events: POLLHUP
+               closing fd 3
+           All file descriptors closed; bye
+
+       In the above output, we see that [1mpoll[22m() returned three times:
+
+       •  On  the first return, the bits returned in the [4mrevents[24m field were [1mPOLLIN[22m, indicating that the file descrip‐
+          tor is readable, and [1mPOLLHUP[22m, indicating that the other end of the FIFO has been closed.  The program  then
+          consumed some of the available input.
+
+       •  The  second return from [1mpoll[22m() also indicated [1mPOLLIN [22mand [1mPOLLHUP[22m; the program then consumed the last of the
+          available input.
+
+       •  On the final return, [1mpoll[22m() indicated only [1mPOLLHUP [22mon the FIFO, at which  point  the  file  descriptor  was
+          closed and the program terminated.
+
+   [1mProgram source[0m
+
+       /* poll_input.c
+
+          Licensed under GNU General Public License v2 or later.
+       */
+       #include <fcntl.h>
+       #include <poll.h>
+       #include <stdio.h>
+       #include <stdlib.h>
+       #include <unistd.h>
+
+       #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
+                               } while (0)
+
+       int
+       main(int argc, char *argv[])
+       {
+           int            ready;
+           char           buf[10];
+           nfds_t         num_open_fds, nfds;
+           ssize_t        s;
+           struct pollfd  *pfds;
+
+           if (argc < 2) {
+              fprintf(stderr, "Usage: %s file...\n", argv[0]);
+              exit(EXIT_FAILURE);
+           }
+
+           num_open_fds = nfds = argc - 1;
+           pfds = calloc(nfds, sizeof(struct pollfd));
+           if (pfds == NULL)
+               errExit("malloc");
+
+           /* Open each file on command line, and add it to 'pfds' array. */
+
+           for (nfds_t j = 0; j < nfds; j++) {
+               pfds[j].fd = open(argv[j + 1], O_RDONLY);
+               if (pfds[j].fd == -1)
+                   errExit("open");
+
+               printf("Opened \"%s\" on fd %d\n", argv[j + 1], pfds[j].fd);
+
+               pfds[j].events = POLLIN;
+           }
+
+           /* Keep calling poll() as long as at least one file descriptor is
+              open. */
+
+           while (num_open_fds > 0) {
+               printf("About to poll()\n");
+               ready = poll(pfds, nfds, -1);
+               if (ready == -1)
+                   errExit("poll");
+
+               printf("Ready: %d\n", ready);
+
+               /* Deal with array returned by poll(). */
+
+               for (nfds_t j = 0; j < nfds; j++) {
+                   if (pfds[j].revents != 0) {
+                       printf("  fd=%d; events: %s%s%s\n", pfds[j].fd,
+                              (pfds[j].revents & POLLIN)  ? "POLLIN "  : "",
+                              (pfds[j].revents & POLLHUP) ? "POLLHUP " : "",
+                              (pfds[j].revents & POLLERR) ? "POLLERR " : "");
+
+                       if (pfds[j].revents & POLLIN) {
+                           s = read(pfds[j].fd, buf, sizeof(buf));
+                           if (s == -1)
+                               errExit("read");
+                           printf("    read %zd bytes: %.*s\n",
+                                  s, (int) s, buf);
+                       } else {                /* POLLERR | POLLHUP */
+                           printf("    closing fd %d\n", pfds[j].fd);
+                           if (close(pfds[j].fd) == -1)
+                               errExit("close");
+                           num_open_fds--;
+                       }
+                   }
+               }
+           }
+
+           printf("All file descriptors closed; bye\n");
+           exit(EXIT_SUCCESS);
+       }
+
+[1mSEE ALSO[0m
+       [1mrestart_syscall[22m(2), [1mselect[22m(2), [1mselect_tut[22m(2), [1mtimespec[22m(3), [1mepoll[22m(7), [1mtime[22m(7)
+
+Linux man-pages 6.7                                   2023-10-31                                              [4mpoll[24m(2)

@@ -186,6 +186,7 @@ int main()
         while (true)
         {
             int32_t err = one_request(connfd);
+            if (err == -1) break;
         }
 
         close(connfd);
