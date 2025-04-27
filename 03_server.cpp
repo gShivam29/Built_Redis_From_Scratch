@@ -19,7 +19,7 @@ void msg(char *message)
 }
 
 static int32_t read_full(int fd, char *buf, size_t n)
-{
+{   
     while (n > 0)
     {
         ssize_t rv = read(fd, buf, n); // reads from fd to buf and only reads n bytes

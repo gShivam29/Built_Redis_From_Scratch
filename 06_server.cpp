@@ -1,12 +1,15 @@
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
 #include <cassert>
 #include <fcntl.h>
 #include <vector>
 #include <poll.h>
+#include <errno.h>
+#include <cstdlib>
 
 const size_t k_max_msg = 4096;
 
@@ -20,7 +23,7 @@ enum
 struct Conn
 {
     int fd = -1;
-    uint32_t state = 0;
+    uint32_t state = STATE_REQ;
 
     size_t rbuf_size = 0;
     uint8_t rbuf[4 + k_max_msg];
@@ -33,7 +36,7 @@ struct Conn
 void die(const char *message)
 {
     perror(message);
-    // exit(1);
+    // exit(1); // Do not exit immediately in production, just log and continue
 }
 
 static void fd_set_nb(int fd)
@@ -41,12 +44,13 @@ static void fd_set_nb(int fd)
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0)
     {
-        die("fcntl error");
+        die("fcntl F_GETFL error");
+        return;
     }
 
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
     {
-        die("fcntl error");
+        die("fcntl F_SETFL error");
     }
 }
 
@@ -54,11 +58,12 @@ static void conn_put(std::vector<Conn *> &fd2conn, Conn *conn)
 {
     if (fd2conn.size() <= (size_t)conn->fd)
     {
-        fd2conn.resize(conn->fd + 1);
+        fd2conn.resize(conn->fd + 1, nullptr); // Initialize with nullptr
     }
     fd2conn[conn->fd] = conn;
 }
 
+// Forward declarations
 static bool try_fill_buffer(Conn *conn);
 static bool try_one_request(Conn *conn);
 static void state_req(Conn *conn);
@@ -77,9 +82,16 @@ static int32_t accept_new_conn(std::vector<Conn *> &fd2conn, int fd)
             return 0;
         }
         die("accept() error");
+        return -1;
     }
 
-    fd_set_nb(connfd);
+    // Log client connection
+    char client_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
+    printf("New connection from %s:%d, assigned fd %d\n",
+           client_ip, ntohs(client_addr.sin_port), connfd);
+
+    fd_set_nb(connfd); // Set the new socket to non-blocking
 
     Conn *conn = new Conn();
     conn->fd = connfd;
@@ -88,12 +100,17 @@ static int32_t accept_new_conn(std::vector<Conn *> &fd2conn, int fd)
     conn->wbuf_size = 0;
     conn->wbuf_sent = 0;
 
-    conn_put(fd2conn, conn);
+    conn_put(fd2conn, conn); // Save the connection in the list
     return 0;
 }
 
 static void connection_io(Conn *conn)
 {
+    if (!conn)
+    {
+        return; // Protect against null pointers
+    }
+
     if (conn->state == STATE_REQ)
     {
         state_req(conn);
@@ -102,9 +119,13 @@ static void connection_io(Conn *conn)
     {
         state_res(conn);
     }
+    else if (conn->state == STATE_END)
+    {
+        // Handle connection cleanup
+    }
     else
     {
-        assert(0);
+        assert(0); // Should never reach here
     }
 }
 
@@ -115,6 +136,11 @@ static bool try_fill_buffer(Conn *conn)
     do
     {
         size_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
+        if (cap == 0)
+        {
+            // Buffer is full, cannot read more
+            return false;
+        }
         rv = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
     } while (rv < 0 && errno == EINTR);
 
@@ -131,6 +157,8 @@ static bool try_fill_buffer(Conn *conn)
 
     if (rv == 0)
     {
+        // Client closed connection
+        printf("Client on fd %d closed connection\n", conn->fd);
         conn->state = STATE_END;
         return false;
     }
@@ -138,6 +166,7 @@ static bool try_fill_buffer(Conn *conn)
     conn->rbuf_size += (size_t)rv;
     assert(conn->rbuf_size <= sizeof(conn->rbuf));
 
+    // Process as many complete requests as possible
     while (try_one_request(conn))
     {
     }
@@ -147,7 +176,7 @@ static bool try_fill_buffer(Conn *conn)
 
 static void state_req(Conn *conn)
 {
-    while (try_fill_buffer(conn))
+    while (try_fill_buffer(conn)) // Fill buffer and process request
     {
     }
 }
@@ -161,31 +190,40 @@ static bool try_one_request(Conn *conn)
 
     uint32_t len = 0;
     memcpy(&len, &conn->rbuf[0], 4);
+    len = ntohl(len); // Convert from network byte order
+
     if (len > k_max_msg)
     {
+        printf("Message too large from fd %d: %u > %zu\n", conn->fd, len, k_max_msg);
         conn->state = STATE_END;
         return false;
     }
 
     if (4 + len > conn->rbuf_size)
     {
-        return false;
+        return false; // Incomplete message, need more data
     }
 
-    printf("client says: %.*s\n", len, &conn->rbuf[4]);
+    printf("client says: %.*s\n", (int)len, &conn->rbuf[4]);
 
-    memcpy(&conn->wbuf[0], &len, 4);
+    // Prepare response (echo back the request)
+    uint32_t len_network = htonl(len); // Convert to network byte order
+    memcpy(&conn->wbuf[0], &len_network, 4);
     memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
     conn->wbuf_size = 4 + len;
+    conn->wbuf_sent = 0;
 
+    // Remove the processed request from the buffer
     size_t remain = conn->rbuf_size - 4 - len;
     if (remain)
     {
         memmove(conn->rbuf, &conn->rbuf[4 + len], remain);
     }
     conn->rbuf_size = remain;
+
+    // Change state to response mode
     conn->state = STATE_RES;
-    state_res(conn);
+    state_res(conn); // Try to send response immediately
 
     return (conn->state == STATE_REQ);
 }
@@ -196,6 +234,15 @@ static bool try_flush_buffer(Conn *conn)
     do
     {
         size_t remain = conn->wbuf_size - conn->wbuf_sent;
+        if (remain == 0)
+        {
+            // Nothing to send, switch back to receiving mode
+            conn->state = STATE_REQ;
+            conn->wbuf_sent = 0;
+            conn->wbuf_size = 0;
+            return false;
+        }
+
         rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], remain);
     } while (rv < 0 && errno == EINTR);
 
@@ -214,18 +261,40 @@ static bool try_flush_buffer(Conn *conn)
 
     if (conn->wbuf_sent == conn->wbuf_size)
     {
+        // Response fully sent, switch back to request mode
         conn->state = STATE_REQ;
         conn->wbuf_sent = 0;
         conn->wbuf_size = 0;
         return false;
     }
-    return true;
+    return true; // More data to send
 }
 
 static void state_res(Conn *conn)
 {
-    while (try_flush_buffer(conn))
+    while (try_flush_buffer(conn)) // Flush buffer and send response
     {
+    }
+}
+
+// Cleanup closed connections
+static void conn_cleanup(std::vector<Conn *> &fd2conn)
+{
+    for (size_t i = 0; i < fd2conn.size(); ++i)
+    {
+        Conn *conn = fd2conn[i];
+        if (!conn)
+        {
+            continue;
+        }
+
+        if (conn->state == STATE_END)
+        {
+            printf("Cleaning up connection fd %d\n", conn->fd);
+            close(conn->fd);
+            fd2conn[i] = nullptr;
+            delete conn;
+        }
     }
 }
 
@@ -235,45 +304,118 @@ int main()
     if (fd < 0)
     {
         die("socket() error");
+        return 1;
     }
-    int val = 1;
 
+    int val = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-    /* takes fd, SOL_SOCKET is the level where the option resides(socker layer),
-    SO_REUSEADDR allows reuse of local addrs
-    val is 1 to enable the option in this case so_reuseaddr will be enabled
-    sizeof(val) size of the option value to tell the function about the number of bytes to expect for the option*/
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(3000);              // Port 3000
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // Bind to all IPs
 
-    struct sockaddr_in addr = {}; // is a struct from netinet/in.h
-
-    addr.sin_family = AF_INET; // socket family is AF_INET
-
-    addr.sin_port = ntohs(3000); // port
-
-    addr.sin_addr.s_addr = ntohl(0); // ip of the server in this case it is 0.0.0.0
-
-    int rv = bind(fd, (const sockaddr *)&addr, sizeof(addr)); // bind function binds the socket to the above ips and port
-
+    int rv = bind(fd, (const sockaddr *)&addr, sizeof(addr));
     if (rv)
     {
-        die("bind()");
+        die("bind() error");
+        close(fd);
+        return 1;
     }
 
-    rv = listen(fd, SOMAXCONN); // listens on the socket that was bound by the bind function, SOMAXXCONN is the max amount of backlog the socket can have
+    rv = listen(fd, SOMAXCONN); // Listen for incoming connections
     if (rv)
     {
-        die("listen()");
+        die("listen() error");
+        close(fd);
+        return 1;
     }
 
     printf("Server is listening on port 3000\n");
+
     std::vector<Conn *> fd2conn;
-    fd_set_nb(fd);
+    fd_set_nb(fd); // Set server socket to non-blocking
+
+    std::vector<struct pollfd> poll_args;
 
     while (true)
     {
-        (void)accept_new_conn(fd2conn, fd);
+        // Clean up closed connections first
+        conn_cleanup(fd2conn);
+
+        // Prepare for polling
+        poll_args.clear();
+        struct pollfd pfd = {fd, POLLIN, 0};
+        poll_args.push_back(pfd);
+
+        // Add client connections to poll
+        for (size_t i = 0; i < fd2conn.size(); ++i)
+        {
+            Conn *conn = fd2conn[i];
+            if (!conn)
+            {
+                continue;
+            }
+
+            struct pollfd pfd = {};
+            pfd.fd = conn->fd;
+            pfd.events = (conn->state == STATE_REQ) ? POLLIN : POLLOUT;
+            poll_args.push_back(pfd);
+        }
+
+        // Wait for events
+        int timeout_ms = 1000; // 1 second timeout for poll
+        int rv = poll(poll_args.data(), poll_args.size(), timeout_ms);
+        if (rv < 0)
+        {
+            die("poll() error");
+            continue;
+        }
+
+        // Check for timeout
+        if (rv == 0)
+        {
+            continue; // Timeout occurred, just loop again
+        }
+
+        // Process events
+        for (size_t i = 0; i < poll_args.size(); ++i)
+        {
+            if (poll_args[i].revents == 0)
+            {
+                continue; // No events for this fd
+            }
+
+            if (poll_args[i].fd == fd)
+            {
+                // Server socket has a new connection
+                if (poll_args[i].revents & POLLIN)
+                {
+                    accept_new_conn(fd2conn, fd);
+                }
+            }
+            else
+            {
+                // Client connection activity
+                int client_fd = poll_args[i].fd;
+                if (client_fd >= 0 && client_fd < (int)fd2conn.size() && fd2conn[client_fd])
+                {
+                    connection_io(fd2conn[client_fd]);
+                }
+            }
+        }
     }
+
+    // Clean up resources (this code is never reached in this example)
+    for (auto conn : fd2conn)
+    {
+        if (conn)
+        {
+            close(conn->fd);
+            delete conn;
+        }
+    }
+    close(fd);
 
     return 0;
 }
