@@ -3,6 +3,10 @@
 #include <cstddef>
 #include <cassert>
 #include <cstdlib>
+#define container_of(ptr, type, member) ({ \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+    (type *)( (char *)__mptr - offsetof(type, member) ); })
+
 struct HNode
 {
     HNode *next = nullptr;
@@ -35,3 +39,5 @@ HNode *hm_lookup(HMap *hmap, HNode *key, bool (*cmp)(HNode *, HNode *));
 void hm_help_resizing(HMap *hmap);
 void hm_insert(HMap *hmap, HNode *node);
 void hm_start_resizing(HMap *hmap);
+HNode *hm_pop(HMap *hmap, HNode *key, bool (*cmp)(HNode *, HNode *));
+uint64_t str_hash(const uint8_t *data, size_t size);
