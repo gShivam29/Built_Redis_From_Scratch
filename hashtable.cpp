@@ -116,24 +116,29 @@ void hm_start_resizing(HMap *hmap)
     hmap->resizing_pos = 0;
 }
 
-HNode *hm_pop(HMap *hmap, HNode *key, bool (*cmp)(HNode*, HNode*)){
+HNode *hm_pop(HMap *hmap, HNode *key, bool (*cmp)(HNode *, HNode *))
+{
     hm_help_resizing(hmap);
     HNode **from = h_lookup(&hmap->ht1, key, cmp);
-    if (from){
+    if (from)
+    {
         return h_detach(&hmap->ht1, from);
     }
     from = h_lookup(&hmap->ht2, key, cmp);
 
-    if(from){
+    if (from)
+    {
         return h_detach(&hmap->ht2, from);
     }
 
     return NULL;
 }
 
-uint64_t str_hash(const uint8_t *data, size_t size) {
+uint64_t str_hash(const uint8_t *data, size_t size)
+{
     uint64_t hash = 5381; // Initial value, prime number
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i)
+    {
         hash = ((hash << 5) + hash) + data[i]; // hash * 33 + data[i]
     }
     return hash;
