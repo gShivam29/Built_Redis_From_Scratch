@@ -1,4 +1,4 @@
-#include <zset.h>
+#include "zset.h"
 #include <cstring>
 #include <algorithm>
 Znode *znode_new(const char *name, size_t len, double score)
@@ -97,7 +97,8 @@ bool znode_cmp(HNode *node, HNode *key)
 {
     Znode *znode = container_of(node, Znode, hmap);
     Znode *zkey = container_of(key, Znode, hmap);
-    if (znode->len != zkey->len) {
+    if (znode->len != zkey->len)
+    {
         return false;
     }
     return memcmp(znode->name, zkey->name, zkey->len) == 0;
@@ -106,14 +107,15 @@ bool znode_cmp(HNode *node, HNode *key)
 // Lookup by name
 Znode *zset_lookup(Zset *zset, const char *name, size_t len)
 {
-    if (!zset->hmap.ht1.tab && !zset->hmap.ht2.tab) {
+    if (!zset->hmap.ht1.tab && !zset->hmap.ht2.tab)
+    {
         return nullptr;
     }
-    
+
     // Create a temporary hash node as a key for lookup
     HNode key;
     key.hcode = str_hash((uint8_t *)name, len);
-    
+
     // We need a temporary znode to store the name for comparison
     // This is allocated on stack just for comparison purposes
     char buf[sizeof(Znode) + len];
@@ -121,33 +123,38 @@ Znode *zset_lookup(Zset *zset, const char *name, size_t len)
     tmp->len = len;
     tmp->hmap.hcode = key.hcode;
     memcpy(&tmp->name[0], name, len);
-    
+
     // Lookup the node in the hash map
     HNode *found = hm_lookup(&zset->hmap, &tmp->hmap, &znode_cmp);
-    
-    if (!found) {
+
+    if (!found)
+    {
         return nullptr;
     }
-    
+
     return container_of(found, Znode, hmap);
 }
 
-Znode *zset_query(Zset *zset, double score, const char *name, size_t len, int64_t offset){
+Znode *zset_query(Zset *zset, double score, const char *name, size_t len, int64_t offset)
+{
     AVLNode *found = NULL;
     AVLNode *curr = zset->tree;
 
-    while(curr){
-        if (zless(curr, score, name, len)){
-            curr = curr -> right;
+    while (curr)
+    {
+        if (zless(curr, score, name, len))
+        {
+            curr = curr->right;
         }
-        else{
-            found = curr; //candidate
-            curr = curr -> left;
+        else
+        {
+            found = curr; // candidate
+            curr = curr->left;
         }
-        
     }
 
-    if(found){
+    if (found)
+    {
         found = avl_offset(found, offset);
     }
 

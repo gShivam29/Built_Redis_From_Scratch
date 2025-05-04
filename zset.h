@@ -1,3 +1,4 @@
+#pragma once
 #include "AVL.cpp"
 #include "hashtable.h"
 struct Zset
