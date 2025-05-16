@@ -81,4 +81,4 @@ cd Built_Redis_From_Scratch
 ./11_client
 
 ```
-⚠️ **Note:** This project is compatible only with Linux-based operating systems, as it relies on the sys/socket.h library, which is specific to Linux/Unix environments.
+⚠️ **Note:** This project is compatible only with Linux-based operating systems, as it relies on the sys/socket.h library, which is specific to Linux/Unix environments. You can also use WSL, this project was developed using WSL.
