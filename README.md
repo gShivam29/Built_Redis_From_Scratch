@@ -65,7 +65,7 @@ A huge shoutout to **J. Smith's book**, which served as a cornerstone and guide 
 
 ## 📚 Who Can Explore This?
 - **Tech Enthusiasts** — Learn how real databases work under the hood.
-- **Non-Technical** — Experience RedisLite through the simple demos below.
+- **Non-Technical** — Experience RedisLite through the simple demos given above.
 - **Students & Engineers** — See data structures like hashtables and AVL trees in real-world use.
 
 ---
