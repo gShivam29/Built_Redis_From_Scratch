@@ -1,6 +1,6 @@
 # RedisLite: A Redis Clone Built From Scratch
 
-Experience the power of in-memory databases — rebuilt from the ground up. **RedisLite** is a lightweight, blazing-fast database inspired by Redis, featuring custom-built data structures, persistent storage, and sorted sets. All handcrafted, no external DB engines used.
+Experience the power of in-memory databases, rebuilt from the ground up. **RedisLite** is a lightweight, blazing-fast database inspired by Redis, featuring custom-built data structures, persistent storage, and sorted sets. All handcrafted, no external DB engines used.
 Built using C and C++.
 
 
