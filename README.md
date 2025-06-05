@@ -7,12 +7,12 @@ Built using C and C++.
 ---
 
 ## ✨ Features at a Glance
-- 🗂 **Custom Data Structures** — Hash tables, sorted sets (ZSETs) and AVL trees implemented from scratch.
-- ⚡ **In-Memory & Fast** — Just like Redis, responses are serialized and lightning-quick.
-- 🔄 **Polling & Pub/Sub** — Real-time updates powered by custom polling logic.
-- 💾 **Persistent Storage** — Keeps your data safe beyond runtime.
-- 🔒 **GET, SET, DEL Supported** — Basic commands fully functional.
-- 🆚 **Redis-Like Commands** — Familiar feel with a unique, ground-up implementation. Supports core Redis commands (GET, SET, DEL) and sorted set queries (ZADD, ZSCORE, ZRANGE).
+- 🗂 **Custom Data Structures** - Hash tables, sorted sets (ZSETs) and AVL trees implemented from scratch.
+- ⚡ **In-Memory & Fast** - Just like Redis, responses are serialized and lightning-quick.
+- 🔄 **Polling & Pub/Sub** - Real-time updates powered by custom polling logic.
+- 💾 **Persistent Storage** - Keeps your data safe beyond runtime.
+- 🔒 **GET, SET, DEL Supported** - Basic commands fully functional.
+- 🆚 **Redis-Like Commands** - Familiar feel with a unique, ground-up implementation. Supports core Redis commands (GET, SET, DEL) and sorted set queries (ZADD, ZSCORE, ZRANGE).
 
 ---
 
@@ -36,13 +36,13 @@ Built using C and C++.
 ---
 
 ## 🛠 Technical Breakdown
-- **Custom Parsing Protocol** — No libraries, just raw parsing.
-- **Custom Hashtable Engine** — Tailored for speed and control.
-- **AVL Tree for Sorted Sets (ZSETs)** — Ensures fast insertions and lookups.
-- **Serialized Responses** — Matching real-world database behavior.
-- **Polling System** — Built from scratch for real-time data sync.
-- **Handles multiple concurrent users** — Using non-blocking I/O and an event loop. Uses polling to serve many clients simultaneously — just like real-world databases.
-- **Command Line Interface** — Custom CLI for a better user experience.
+- **Custom Parsing Protocol** - No libraries, just raw parsing.
+- **Custom Hashtable Engine** - Tailored for speed and control.
+- **AVL Tree for Sorted Sets (ZSETs)** - Ensures fast insertions and lookups.
+- **Serialized Responses** - Matching real-world database behavior.
+- **Polling System** - Built from scratch for real-time data sync.
+- **Handles multiple concurrent users** - Using non-blocking I/O and an event loop. Uses polling to serve many clients simultaneously — just like real-world databases.
+- **Command Line Interface** - Custom CLI for a better user experience.
 
 ---
 
@@ -64,9 +64,9 @@ A huge shoutout to **J. Smith's book**, which served as a cornerstone and guide 
 ---
 
 ## 📚 Who Can Explore This?
-- **Tech Enthusiasts** — Learn how real databases work under the hood.
-- **Non-Technical** — Experience RedisLite through the simple demos given above.
-- **Students & Engineers** — See data structures like hashtables and AVL trees in real-world use.
+- **Tech Enthusiasts** - Learn how real databases work under the hood.
+- **Non-Technical** - Experience RedisLite through the simple demos given above.
+- **Students & Engineers** - See data structures like hashtables and AVL trees in real-world use.
 
 ---
 
